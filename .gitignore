@@ -1,0 +1,36 @@
+# Python compiler artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments and configs
+.env
+.env.*
+env/
+venv/
+ENV/
+.venv/
+
+# IDE / Editor folders and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# Static analysis and local artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.codereview_cache/
+reports/
+*.sarif
+*.html
+*.pdf
+
+# Local planning and working documents
+planner.txt
+idea_working.txt
+*idea*.txt
+ideatxt*
