@@ -3,7 +3,7 @@ from openai import OpenAI
 from codereview.config import Config
 from codereview.llm.base import BaseLLMProvider
 from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
-from codereview.models.review import ReviewResult
+from codereview.models import ReviewResult, CodeContext
 
 class OpenAIProvider(BaseLLMProvider):
     def __init__(self, config: Config):
@@ -13,11 +13,11 @@ class OpenAIProvider(BaseLLMProvider):
         self.model = config.default_model
         self.temperature = config.temperature
 
-    def generate_review(self, code_content: str, filename: str) -> ReviewResult:
+    def generate_review(self, code_context: CodeContext) -> ReviewResult:
         # Check API key before sending
         self.config.validate()
         
-        user_prompt = format_review_prompt(code_content, filename)
+        user_prompt = format_review_prompt(code_context)
         
         try:
             completion = self.client.beta.chat.completions.parse(

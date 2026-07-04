@@ -1,14 +1,14 @@
 from datetime import datetime
 from codereview.llm.base import BaseLLMProvider
-from codereview.models import ReviewResult, Summary, Score, Issue, Suggestion
+from codereview.models import ReviewResult, Summary, Score, Issue, Suggestion, CodeContext
 
 class MockProvider(BaseLLMProvider):
     def __init__(self, config):
         self.config = config
 
-    def generate_review(self, code_content: str, filename: str) -> ReviewResult:
+    def generate_review(self, code_context: CodeContext) -> ReviewResult:
         # Generate a dummy review result based on content
-        lines = code_content.split('\n')
+        lines = code_context.source_code.split('\n')
         first_line = lines[0] if lines else ""
         
         return ReviewResult(

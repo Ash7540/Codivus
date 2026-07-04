@@ -3,6 +3,7 @@ from typing import Optional
 from codereview.config import Config
 from codereview.llm.router import get_provider
 from codereview.models.review import ReviewResult
+from codereview.parsers import get_parser_for_file
 
 class Reviewer:
     def __init__(self, config: Optional[Config] = None):
@@ -13,17 +14,24 @@ class Reviewer:
         """
         Reviews a single file and returns structured review results.
         """
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"File not found: {filepath}")
+        # Ensure filepath is absolute to have reliable paths in CodeContext
+        abs_filepath = os.path.abspath(filepath)
         
-        if not os.path.isfile(filepath):
-            raise ValueError(f"Path is not a file: {filepath}")
+        if not os.path.exists(abs_filepath):
+            raise FileNotFoundError(f"File not found: {abs_filepath}")
+        
+        if not os.path.isfile(abs_filepath):
+            raise ValueError(f"Path is not a file: {abs_filepath}")
             
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(abs_filepath, "r", encoding="utf-8") as f:
                 code_content = f.read()
         except Exception as e:
-            raise RuntimeError(f"Failed to read file {filepath}: {str(e)}")
+            raise RuntimeError(f"Failed to read file {abs_filepath}: {str(e)}")
 
-        filename = os.path.basename(filepath)
-        return self.provider.generate_review(code_content, filename)
+        # 1. Parse file content into CodeContext
+        parser = get_parser_for_file(abs_filepath)
+        code_context = parser.parse_code(code_content, abs_filepath)
+
+        # 2. Invoke LLM provider with CodeContext
+        return self.provider.generate_review(code_context)
