@@ -1,23 +1,23 @@
 from datetime import datetime
+from typing import List, Optional
 from openai import OpenAI
 from codereview.config import Config
 from codereview.llm.base import BaseLLMProvider
 from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
-from codereview.models import ReviewResult, CodeContext
+from codereview.models import ReviewResult, CodeContext, Issue
 
 class OpenAIProvider(BaseLLMProvider):
     def __init__(self, config: Config):
         self.config = config
-        # Use provided key or default from env
         self.client = OpenAI(api_key=config.openai_api_key)
         self.model = config.default_model
         self.temperature = config.temperature
 
-    def generate_review(self, code_context: CodeContext) -> ReviewResult:
+    def generate_review(self, code_context: CodeContext, static_issues: Optional[List[Issue]] = None) -> ReviewResult:
         # Check API key before sending
         self.config.validate()
         
-        user_prompt = format_review_prompt(code_context)
+        user_prompt = format_review_prompt(code_context, static_issues)
         
         try:
             completion = self.client.beta.chat.completions.parse(

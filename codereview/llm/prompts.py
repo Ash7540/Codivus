@@ -1,4 +1,5 @@
-from codereview.models.structure import CodeContext
+from typing import List, Optional
+from codereview.models import CodeContext, Issue
 
 SYSTEM_PROMPT = """
 You are an expert software engineer and security auditor. Your task is to perform an automated code review on the provided file.
@@ -21,7 +22,7 @@ Also, calculate quality scores (0 to 100) for overall, security, performance, an
 Finally, compile a summary of findings.
 """
 
-def format_review_prompt(context: CodeContext) -> str:
+def format_review_prompt(context: CodeContext, static_issues: Optional[List[Issue]] = None) -> str:
     # Build structural outline
     imports_str = "\n".join([
         f"  - {imp.from_module + '.' if imp.from_module else ''}{imp.name}"
@@ -50,6 +51,14 @@ def format_review_prompt(context: CodeContext) -> str:
         f"  - Functions Count:     {context.stats.num_functions}"
     )
 
+    static_findings_block = ""
+    if static_issues:
+        static_findings_block = "\n--- Detected Static Analysis Findings ---\n"
+        for idx, issue in enumerate(static_issues, start=1):
+            line_str = f"Line {issue.line_number}: " if issue.line_number else ""
+            static_findings_block += f"  {idx}. [{issue.category.upper()} - {issue.severity.upper()}] {line_str}{issue.title}: {issue.description}\n"
+        static_findings_block += "\nPlease review the code context and the above static findings. Suggest deep solutions and expand on other logic, performance, style, or security issues not covered by these static analysis tools. Avoid duplicating these exact findings unless adding significantly more depth.\n"
+
     return f"""
 Please review the following file:
 Filename: {context.filename}
@@ -67,7 +76,7 @@ Module-Level Functions:
 
 File Statistics:
 {stats_str}
-
+{static_findings_block}
 --- Source Code ---
 ```python
 {context.source_code}
