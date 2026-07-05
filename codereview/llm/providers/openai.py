@@ -28,6 +28,7 @@ class OpenAIProvider(BaseLLMProvider):
                 ],
                 response_format=ReviewResult,
                 temperature=self.temperature,
+                max_completion_tokens=2000  # Cap generation length to prevent runaway repetition loops
             )
             
             parsed_result = completion.choices[0].message.parsed

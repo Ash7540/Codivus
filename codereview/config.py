@@ -31,12 +31,12 @@ class Config:
         if "temperature" in overrides:
             raw_temp = overrides["temperature"]
         else:
-            raw_temp = os.getenv("CODIVUS_TEMPERATURE", "0.1")
+            raw_temp = os.getenv("CODIVUS_TEMPERATURE", "0.2")
             
         try:
-            self.temperature = float(raw_temp) if raw_temp is not None else 0.1
+            self.temperature = float(raw_temp) if raw_temp is not None else 0.2
         except ValueError:
-            self.temperature = 0.1
+            self.temperature = 0.2
 
     def validate(self) -> None:
         """Validate critical configuration settings."""

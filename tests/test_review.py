@@ -57,7 +57,7 @@ def test_config_defaults(mock_getenv, mock_load_dotenv):
     config = Config()
     assert config.default_provider == "openai"
     assert config.default_model == "gpt-4o-mini"
-    assert config.temperature == 0.1
+    assert config.temperature == 0.2
     assert config.openai_api_key is None
 
 

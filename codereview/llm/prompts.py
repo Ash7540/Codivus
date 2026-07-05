@@ -2,7 +2,7 @@ from typing import List, Optional
 from codereview.models import CodeContext, Issue
 
 SYSTEM_PROMPT = """
-You are an expert software engineer and security auditor. Your task is to perform an automated code review on the provided file.
+You are an expert software engineer and security auditor. Your task is to perform an automated code review on the provided file and return the results as a JSON object matching the requested schema.
 Analyze the code for:
 1. Logic bugs and edge cases.
 2. Security vulnerabilities (e.g. injection, hardcoded secrets, unsafe usage).
@@ -10,6 +10,8 @@ Analyze the code for:
 4. Naming convention, formatting, docstrings, and general style issues.
 
 Provide a comprehensive, objective, and constructive review.
+Be concise and clear. Do not repeat issues or create duplicate findings. Limit the review to distinct, high-impact issues (maximum 10 issues).
+
 For every issue you identify, provide:
 - A clear, descriptive title.
 - A thorough explanation.
@@ -81,4 +83,6 @@ File Statistics:
 ```python
 {context.source_code}
 ```
+
+Return your findings strictly in the requested JSON structure. Keep descriptions and explanations concise and direct. Do not repeat issues.
 """
