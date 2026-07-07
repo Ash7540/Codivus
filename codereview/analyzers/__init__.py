@@ -6,6 +6,7 @@ from codereview.analyzers.deadcode import DeadCodeAnalyzer
 from codereview.analyzers.duplication import DuplicationAnalyzer
 from codereview.analyzers.metrics import MetricsAnalyzer
 from codereview.security import SecurityAnalyzer
+from codereview.performance import PerformanceAnalyzer
 
 def run_static_analysis(context: CodeContext) -> List[Issue]:
     """
@@ -17,6 +18,7 @@ def run_static_analysis(context: CodeContext) -> List[Issue]:
         DuplicationAnalyzer(),
         MetricsAnalyzer(),
         SecurityAnalyzer(),
+        PerformanceAnalyzer(),
     ]
     
     all_issues = []
@@ -37,6 +39,8 @@ __all__ = [
     "DuplicationAnalyzer",
     "MetricsAnalyzer",
     "SecurityAnalyzer",
+    "PerformanceAnalyzer",
     "run_static_analysis",
 ]
+
 
