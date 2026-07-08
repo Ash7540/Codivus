@@ -121,7 +121,8 @@ def test_reviewer_success(mock_openai_class, tmp_path):
     
     # Create a temporary file to review
     test_file = tmp_path / "test.py"
-    test_file.write_text("print('hello')", encoding="utf-8")
+    test_file.write_text('"""Module docstring."""\nprint("hello")\n', encoding="utf-8")
+
     
     # Initialize and run reviewer
     config = Config({"openai_api_key": "fake_key"})
