@@ -44,3 +44,16 @@ class MockProvider(BaseLLMProvider):
             ],
             timestamp=datetime.utcnow().isoformat() + "Z"
         )
+
+    def generate_repo_summary(
+        self,
+        folder_structure: str,
+        dependency_map: dict,
+        repo_issues: List[Issue],
+        file_summaries: List[str]
+    ) -> dict:
+        return {
+            "summary_text": "Mock repository review summary completed successfully. Analyzed overall folder structure and mapped code dependencies.",
+            "architecture_overview": "Mock Architecture Overview: The repository is organized as a standard python package. Files are modular and import relationships are clean."
+        }
+

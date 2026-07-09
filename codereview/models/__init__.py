@@ -2,7 +2,7 @@ from codereview.models.suggestion import Suggestion
 from codereview.models.issue import Issue
 from codereview.models.score import Score
 from codereview.models.summary import Summary
-from codereview.models.review import ReviewResult
+from codereview.models.review import ReviewResult, RepositorySummary, RepositoryReviewResult
 from codereview.models.structure import (
     ImportInfo,
     FunctionInfo,
@@ -17,9 +17,12 @@ __all__ = [
     "Score",
     "Summary",
     "ReviewResult",
+    "RepositorySummary",
+    "RepositoryReviewResult",
     "ImportInfo",
     "FunctionInfo",
     "ClassInfo",
     "FileStats",
     "CodeContext",
 ]
+

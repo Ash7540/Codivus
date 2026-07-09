@@ -1,8 +1,17 @@
 import os
-from typing import Optional
+from datetime import datetime
+from typing import Optional, List, Dict, Set
 from codereview.config import Config
 from codereview.llm.router import get_provider
-from codereview.models import ReviewResult, Summary, Score
+from codereview.models import (
+    ReviewResult,
+    Summary,
+    Score,
+    RepositorySummary,
+    RepositoryReviewResult,
+    Issue,
+    Suggestion,
+)
 from codereview.parsers import get_parser_for_file
 from codereview.analyzers import run_static_analysis
 
@@ -15,7 +24,6 @@ class Reviewer:
         """
         Reviews a single file and returns structured review results.
         """
-        # Ensure filepath is absolute
         abs_filepath = os.path.abspath(filepath)
         
         if not os.path.exists(abs_filepath):
@@ -74,6 +82,158 @@ class Reviewer:
             timestamp=llm_result.timestamp
         )
 
+    def review_dir(self, dirpath: str) -> RepositoryReviewResult:
+        """
+        Reviews a directory containing a Python project codebase and returns RepositoryReviewResult.
+        """
+        abs_dirpath = os.path.abspath(dirpath)
+        if not os.path.exists(abs_dirpath):
+            raise FileNotFoundError(f"Directory not found: {abs_dirpath}")
+        if not os.path.isdir(abs_dirpath):
+            raise ValueError(f"Path is not a directory: {abs_dirpath}")
+
+        EXCLUDES = {
+            ".git", "__pycache__", ".venv", "env", "venv", ".pytest_cache", ".agents",
+            "build", "dist", ".github", "egg-info", "codivus.egg-info", ".idea", ".vscode"
+        }
+
+        # 1. Recursive scan of python files
+        all_py_files = []
+        for root, dirs, files in os.walk(abs_dirpath):
+            dirs[:] = [d for d in dirs if d not in EXCLUDES and not d.startswith('.')]
+            for file in files:
+                if file.endswith('.py'):
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, abs_dirpath).replace('\\', '/')
+                    all_py_files.append((full_path, rel_path))
+
+        # Sort files for deterministic execution order
+        all_py_files.sort(key=lambda x: x[1])
+
+        # 2. Run file-level reviews
+        file_reviews = {}
+        total_loc = 0
+        all_static_issues = []
+        file_summaries = []
+        dep_graph = {}
+        all_rel_files = {rel_path for _, rel_path in all_py_files}
+
+        for full_path, rel_path in all_py_files:
+            review_res = self.review_file(full_path)
+            file_reviews[rel_path] = review_res
+            
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            parser = get_parser_for_file(full_path)
+            context = parser.parse_code(content, full_path)
+            total_loc += context.stats.loc
+            
+            # Map internal dependencies
+            deps = []
+            for imp in context.imports:
+                resolved = self._resolve_import_to_local_file(imp.name, abs_dirpath, full_path)
+                if resolved and resolved in all_rel_files:
+                    deps.append(resolved)
+            dep_graph[rel_path] = deps
+            
+            # Check for broken local imports in this file
+            broken_imports = self._check_broken_local_imports(context.imports, abs_dirpath, rel_path, all_rel_files)
+            all_static_issues.extend(broken_imports)
+            
+            file_summaries.append(f"- File `{rel_path}`: {review_res.summary.summary_text}")
+
+        # 3. Detect circular dependencies
+        cycles = self._find_circular_dependencies(dep_graph)
+        for cycle in cycles:
+            cycle_str = " -> ".join(cycle)
+            all_static_issues.append(Issue(
+                title="Circular Dependency Detected",
+                description=f"A circular dependency chain was detected: {cycle_str}. Circular dependencies tightly couple modules and make them harder to read and maintain.",
+                severity="medium",
+                category="style",
+                line_number=None,
+                code_snippet=None,
+                suggestion=Suggestion(
+                    original_code="",
+                    proposed_code="# Refactor modules to break dependency cycle, e.g. using interfaces or a third shared module.",
+                    explanation="Breaking circular imports decreases coupling and simplifies testing and extension."
+                )
+            ))
+
+        # 4. Generate folder structure tree
+        folder_structure = self._generate_folder_tree(abs_dirpath, EXCLUDES)
+
+        # 5. Invoke LLM for repository overview
+        llm_repo_res = self.provider.generate_repo_summary(
+            folder_structure=folder_structure,
+            dependency_map=dep_graph,
+            repo_issues=all_static_issues,
+            file_summaries=file_summaries
+        )
+
+        # 6. Compute overall metrics
+        all_combined_issues = all_static_issues.copy()
+        for f_res in file_reviews.values():
+            all_combined_issues.extend(f_res.issues)
+            
+        total_issues = len(all_combined_issues)
+        critical_count = sum(1 for i in all_combined_issues if i.severity.lower() == "critical")
+        high_count = sum(1 for i in all_combined_issues if i.severity.lower() == "high")
+        medium_count = sum(1 for i in all_combined_issues if i.severity.lower() == "medium")
+        low_count = sum(1 for i in all_combined_issues if i.severity.lower() == "low")
+
+        repo_summary = RepositorySummary(
+            total_files=len(all_py_files),
+            total_loc=total_loc,
+            total_issues=total_issues,
+            critical_issues=critical_count,
+            high_issues=high_count,
+            medium_issues=medium_count,
+            low_issues=low_count,
+            summary_text=llm_repo_res["summary_text"]
+        )
+
+        # 7. Compute overall scores
+        avg_overall = sum(r.score.overall_score for r in file_reviews.values()) / max(1, len(file_reviews))
+        avg_security = sum(r.score.security_score for r in file_reviews.values()) / max(1, len(file_reviews))
+        avg_performance = sum(r.score.performance_score for r in file_reviews.values()) / max(1, len(file_reviews))
+        avg_style = sum(r.score.style_score for r in file_reviews.values()) / max(1, len(file_reviews))
+
+        severity_deductions = {
+            "critical": 20.0,
+            "high": 15.0,
+            "medium": 10.0,
+            "low": 5.0
+        }
+        for issue in all_static_issues:
+            deduction = severity_deductions.get(issue.severity.lower(), 5.0)
+            avg_overall -= deduction
+            
+            cat = issue.category.lower()
+            if cat == "security":
+                avg_security -= deduction
+            elif cat == "performance":
+                avg_performance -= deduction
+            elif cat == "style" or cat == "bug":
+                avg_style -= deduction
+
+        final_score = Score(
+            overall_score=max(0.0, min(100.0, avg_overall)),
+            security_score=max(0.0, min(100.0, avg_security)),
+            performance_score=max(0.0, min(100.0, avg_performance)),
+            style_score=max(0.0, min(100.0, avg_style))
+        )
+
+        return RepositoryReviewResult(
+            summary=repo_summary,
+            overall_score=final_score,
+            file_reviews=file_reviews,
+            repo_issues=all_static_issues,
+            architecture_overview=llm_repo_res["architecture_overview"],
+            folder_structure=folder_structure,
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+
     def _recalculate_scores(self, llm_score: Score, static_issues) -> Score:
         overall = llm_score.overall_score
         security = llm_score.security_score
@@ -105,3 +265,114 @@ class Reviewer:
             performance_score=max(0.0, min(100.0, performance)),
             style_score=max(0.0, min(100.0, style))
         )
+
+    def _generate_folder_tree(self, dirpath: str, excludes: Set[str]) -> str:
+        tree_lines = []
+        base_name = os.path.basename(os.path.abspath(dirpath))
+        tree_lines.append(f"{base_name}/")
+        
+        def walk_tree(current_dir, prefix=""):
+            try:
+                entries = sorted(os.listdir(current_dir))
+            except Exception:
+                return
+                
+            entries = [e for e in entries if e not in excludes and not e.startswith('.')]
+            
+            for i, entry in enumerate(entries):
+                is_last = (i == len(entries) - 1)
+                connector = "└── " if is_last else "├── "
+                full_path = os.path.join(current_dir, entry)
+                
+                if os.path.isdir(full_path):
+                    tree_lines.append(f"{prefix}{connector}{entry}/")
+                    new_prefix = prefix + ("    " if is_last else "│   ")
+                    walk_tree(full_path, new_prefix)
+                else:
+                    tree_lines.append(f"{prefix}{connector}{entry}")
+                    
+        walk_tree(os.path.abspath(dirpath))
+        return "\n".join(tree_lines)
+
+    def _resolve_import_to_local_file(self, import_name: str, root_dir: str, current_file: str) -> Optional[str]:
+        parts = import_name.split('.')
+        # 1. Absolute import from root
+        possible_path = os.path.join(root_dir, *parts) + ".py"
+        if os.path.exists(possible_path):
+            return os.path.relpath(possible_path, root_dir).replace('\\', '/')
+            
+        possible_dir = os.path.join(root_dir, *parts, "__init__.py")
+        if os.path.exists(possible_dir):
+            return os.path.relpath(possible_dir, root_dir).replace('\\', '/')
+
+        # 2. Relative import from current file's directory
+        curr_dir = os.path.dirname(os.path.abspath(current_file))
+        possible_rel_path = os.path.join(curr_dir, *parts) + ".py"
+        if os.path.exists(possible_rel_path):
+            return os.path.relpath(possible_rel_path, root_dir).replace('\\', '/')
+            
+        possible_rel_dir = os.path.join(curr_dir, *parts, "__init__.py")
+        if os.path.exists(possible_rel_dir):
+            return os.path.relpath(possible_rel_dir, root_dir).replace('\\', '/')
+            
+        return None
+
+    def _find_circular_dependencies(self, dep_graph: Dict[str, List[str]]) -> List[List[str]]:
+        cycles = []
+        visited = {} # node -> 0: unvisited, 1: visiting, 2: visited
+        
+        def dfs(node, path):
+            visited[node] = 1
+            path.append(node)
+            for neighbor in dep_graph.get(node, []):
+                if visited.get(neighbor, 0) == 1:
+                    cycle_start = path.index(neighbor)
+                    cycle_chain = path[cycle_start:] + [neighbor]
+                    is_dup = False
+                    for existing in cycles:
+                        if len(existing) == len(cycle_chain):
+                            ext_str = "-".join(existing[:-1])
+                            norm_str = "-".join(cycle_chain[:-1])
+                            if any((ext_str in (norm_str + "-" + norm_str)) for _ in range(1)):
+                                is_dup = True
+                                break
+                    if not is_dup:
+                        cycles.append(cycle_chain)
+                elif visited.get(neighbor, 0) == 0:
+                    dfs(neighbor, path)
+            path.pop()
+            visited[node] = 2
+
+        for node in dep_graph:
+            if visited.get(node, 0) == 0:
+                dfs(node, [])
+        return cycles
+
+    def _check_broken_local_imports(self, imports_list, root_dir: str, file_rel_path: str, all_rel_files: Set[str]) -> List[Issue]:
+        issues = []
+        for imp in imports_list:
+            import_name = imp.name
+            parts = import_name.split('.')
+            first_part = parts[0]
+            
+            local_candidate_dir = os.path.join(root_dir, first_part)
+            local_candidate_file = os.path.join(root_dir, first_part + ".py")
+            
+            if os.path.exists(local_candidate_dir) or os.path.exists(local_candidate_file):
+                resolved_rel = self._resolve_import_to_local_file(import_name, root_dir, os.path.join(root_dir, file_rel_path))
+                if resolved_rel is None:
+                    issues.append(Issue(
+                        title="Broken Local Import",
+                        description=f"Local module '{import_name}' is imported in '{file_rel_path}' but could not be resolved to any file in the repository.",
+                        severity="high",
+                        category="bug",
+                        line_number=imp.line_number,
+                        code_snippet=f"import {import_name}",
+                        suggestion=Suggestion(
+                            original_code=f"import {import_name}",
+                            proposed_code=f"# Fix import name or create the missing module '{import_name}'",
+                            explanation="Importing modules that do not exist results in immediate runtime ImportError/ModuleNotFoundError."
+                        )
+                    ))
+        return issues
+
