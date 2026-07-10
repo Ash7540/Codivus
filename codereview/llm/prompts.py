@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Set
 from codereview.models import CodeContext, Issue
 
 SYSTEM_PROMPT = """
@@ -24,7 +24,11 @@ Also, calculate quality scores (0 to 100) for overall, security, performance, an
 Finally, compile a summary of findings.
 """
 
-def format_review_prompt(context: CodeContext, static_issues: Optional[List[Issue]] = None) -> str:
+def format_review_prompt(
+    context: CodeContext, 
+    static_issues: Optional[List[Issue]] = None, 
+    modified_lines: Optional[Set[int]] = None
+) -> str:
     # Build structural outline
     imports_str = "\n".join([
         f"  - {imp.from_module + '.' if imp.from_module else ''}{imp.name}"
@@ -61,6 +65,14 @@ def format_review_prompt(context: CodeContext, static_issues: Optional[List[Issu
             static_findings_block += f"  {idx}. [{issue.category.upper()} - {issue.severity.upper()}] {line_str}{issue.title}: {issue.description}\n"
         static_findings_block += "\nPlease review the code context and the above static findings. Suggest deep solutions and expand on other logic, performance, style, or security issues not covered by these static analysis tools. Avoid duplicating these exact findings unless adding significantly more depth.\n"
 
+    git_focus_block = ""
+    if modified_lines:
+        git_focus_block = (
+            f"\n--- Git Modifications ---\n"
+            f"IMPORTANT: Focus your review, issues, and code suggestions exclusively on the following modified/added line numbers: {sorted(list(modified_lines))}.\n"
+            f"Ignore unmodified parts of the file unless they directly interface with or are broken by these new changes.\n"
+        )
+
     return f"""
 Please review the following file:
 Filename: {context.filename}
@@ -78,7 +90,7 @@ Module-Level Functions:
 
 File Statistics:
 {stats_str}
-{static_findings_block}
+{static_findings_block}{git_focus_block}
 --- Source Code ---
 ```python
 {context.source_code}
@@ -86,3 +98,4 @@ File Statistics:
 
 Return your findings strictly in the requested JSON structure. Keep descriptions and explanations concise and direct. Do not repeat issues.
 """
+

@@ -1,16 +1,22 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 from codereview.models.review import ReviewResult
 from codereview.models.structure import CodeContext
 from codereview.models.issue import Issue
 
 class BaseLLMProvider(ABC):
     @abstractmethod
-    def generate_review(self, code_context: CodeContext, static_issues: Optional[List[Issue]] = None) -> ReviewResult:
+    def generate_review(
+        self, 
+        code_context: CodeContext, 
+        static_issues: Optional[List[Issue]] = None,
+        modified_lines: Optional[Set[int]] = None
+    ) -> ReviewResult:
         """
         Sends parsed code context and optional static analysis findings to the LLM provider and returns a structured ReviewResult.
         """
         pass
+
 
     @abstractmethod
     def generate_repo_summary(

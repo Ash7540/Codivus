@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 from openai import OpenAI
 from codereview.config import Config
 from codereview.llm.base import BaseLLMProvider
@@ -14,11 +14,17 @@ class OpenAIProvider(BaseLLMProvider):
         self.model = config.default_model
         self.temperature = config.temperature
 
-    def generate_review(self, code_context: CodeContext, static_issues: Optional[List[Issue]] = None) -> ReviewResult:
+    def generate_review(
+        self, 
+        code_context: CodeContext, 
+        static_issues: Optional[List[Issue]] = None,
+        modified_lines: Optional[Set[int]] = None
+    ) -> ReviewResult:
         # Check API key before sending
         self.config.validate()
         
-        user_prompt = format_review_prompt(code_context, static_issues)
+        user_prompt = format_review_prompt(code_context, static_issues, modified_lines)
+
         
         try:
             completion = self.client.beta.chat.completions.parse(
