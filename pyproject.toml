@@ -20,8 +20,12 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.scripts]
+codivus = "codereview.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "ruff>=0.1.0",
 ]
+
