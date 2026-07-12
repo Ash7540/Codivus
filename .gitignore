@@ -24,7 +24,7 @@ ENV/
 .coverage
 htmlcov/
 .codereview_cache/
-reports/
+/reports/
 *.sarif
 *.html
 *.pdf

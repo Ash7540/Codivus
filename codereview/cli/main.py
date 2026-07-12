@@ -1,9 +1,11 @@
 import argparse
 import sys
 import os
+import tempfile
 from codereview.config import Config
 from codereview.reviewer import Reviewer
 from codereview.cli.report import format_console_report, format_markdown_report, format_json_report
+from codereview.reports import export_json, export_markdown, export_html, export_sarif, export_pdf
 
 def main():
     parser = argparse.ArgumentParser(
@@ -27,9 +29,9 @@ def main():
     )
     parser.add_argument(
         "--format",
-        choices=["text", "json", "markdown"],
+        choices=["text", "json", "markdown", "html", "sarif", "pdf"],
         default="text",
-        help="Report output format (text, json, or markdown). Default: text"
+        help="Report output format (text, json, markdown, html, sarif, or pdf). Default: text"
     )
     parser.add_argument(
         "--output",
@@ -65,25 +67,60 @@ def main():
         print(f"Error executing review: {str(e)}", file=sys.stderr)
         sys.exit(1)
         
-    # 4. Format report output
-    if args.format == "json":
-        report_content = format_json_report(result)
-    elif args.format == "markdown":
-        report_content = format_markdown_report(result)
-    else:
-        report_content = format_console_report(result)
-        
-    # 5. Output report
+    # 4. Handle PDF output constraint
+    if args.format == "pdf" and not args.output:
+        print("Error: PDF format requires an --output file path.", file=sys.stderr)
+        sys.exit(1)
+
+    # 5. Output report (file or stdout)
     if args.output:
         try:
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(report_content)
+            if args.format == "json":
+                export_json(result, args.output)
+            elif args.format == "markdown":
+                export_markdown(result, args.output)
+            elif args.format == "html":
+                export_html(result, args.output)
+            elif args.format == "sarif":
+                export_sarif(result, args.output)
+            elif args.format == "pdf":
+                export_pdf(result, args.output)
+            else:
+                # Text format
+                report_content = format_console_report(result)
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(report_content)
             print(f"Report successfully saved to: {args.output}")
         except Exception as e:
             print(f"Error writing report to file: {str(e)}", file=sys.stderr)
             sys.exit(1)
     else:
-        print(report_content)
+        # Print to stdout
+        if args.format == "json":
+            print(format_json_report(result))
+        elif args.format == "markdown":
+            print(format_markdown_report(result))
+        elif args.format == "html":
+            fd, temp_path = tempfile.mkstemp(suffix=".html")
+            try:
+                export_html(result, temp_path)
+                with open(temp_path, "r", encoding="utf-8") as f:
+                    print(f.read())
+            finally:
+                os.close(fd)
+                os.remove(temp_path)
+        elif args.format == "sarif":
+            fd, temp_path = tempfile.mkstemp(suffix=".sarif")
+            try:
+                export_sarif(result, temp_path)
+                with open(temp_path, "r", encoding="utf-8") as f:
+                    print(f.read())
+            finally:
+                os.close(fd)
+                os.remove(temp_path)
+        else:
+            print(format_console_report(result))
 
 if __name__ == "__main__":
     main()
+
