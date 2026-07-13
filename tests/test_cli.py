@@ -75,9 +75,9 @@ def test_repo_report_formatters():
     assert "Mock repo architecture overview." in markdown_out
     assert "my_project/" in result.folder_structure
 
-@patch("codereview.cli.main.Reviewer")
-@patch("codereview.cli.main.os.path.isdir")
-@patch("codereview.cli.main.os.path.exists")
+@patch("codereview.cli.review.Reviewer")
+@patch("codereview.cli.review.os.path.isdir")
+@patch("codereview.cli.review.os.path.exists")
 def test_cli_execution_flows(mock_exists, mock_isdir, mock_reviewer_class, tmp_path):
     mock_exists.return_value = True
     mock_isdir.return_value = False

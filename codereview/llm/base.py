@@ -10,7 +10,8 @@ class BaseLLMProvider(ABC):
         self, 
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
-        modified_lines: Optional[Set[int]] = None
+        modified_lines: Optional[Set[int]] = None,
+        category_focus: Optional[str] = None
     ) -> ReviewResult:
         """
         Sends parsed code context and optional static analysis findings to the LLM provider and returns a structured ReviewResult.

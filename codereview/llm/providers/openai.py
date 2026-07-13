@@ -18,12 +18,13 @@ class OpenAIProvider(BaseLLMProvider):
         self, 
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
-        modified_lines: Optional[Set[int]] = None
+        modified_lines: Optional[Set[int]] = None,
+        category_focus: Optional[str] = None
     ) -> ReviewResult:
         # Check API key before sending
         self.config.validate()
         
-        user_prompt = format_review_prompt(code_context, static_issues, modified_lines)
+        user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
 
         
         try:

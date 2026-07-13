@@ -56,3 +56,12 @@ class GitRepository:
         # Get diff of a file in specific commit
         # For a specific commit, we can show diff against parent
         return self._run_git(["show", commit_hash, "--", filepath])
+
+    def get_files_in_diff(self, ref_range: str) -> List[str]:
+        output = self._run_git(["diff", "--name-only", "--diff-filter=ACMR", ref_range])
+        if not output:
+            return []
+        return [os.path.join(self.repo_path, line) for line in output.splitlines() if line.strip().endswith('.py')]
+
+    def get_diff_between_refs(self, ref_range: str, filepath: str) -> str:
+        return self._run_git(["diff", ref_range, "--", filepath])

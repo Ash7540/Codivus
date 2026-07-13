@@ -11,7 +11,8 @@ class MockProvider(BaseLLMProvider):
         self, 
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
-        modified_lines: Optional[Set[int]] = None
+        modified_lines: Optional[Set[int]] = None,
+        category_focus: Optional[str] = None
     ) -> ReviewResult:
 
         # Generate a dummy review result based on content

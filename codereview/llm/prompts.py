@@ -27,7 +27,8 @@ Finally, compile a summary of findings.
 def format_review_prompt(
     context: CodeContext, 
     static_issues: Optional[List[Issue]] = None, 
-    modified_lines: Optional[Set[int]] = None
+    modified_lines: Optional[Set[int]] = None,
+    category_focus: Optional[str] = None
 ) -> str:
     # Build structural outline
     imports_str = "\n".join([
@@ -63,7 +64,7 @@ def format_review_prompt(
         for idx, issue in enumerate(static_issues, start=1):
             line_str = f"Line {issue.line_number}: " if issue.line_number else ""
             static_findings_block += f"  {idx}. [{issue.category.upper()} - {issue.severity.upper()}] {line_str}{issue.title}: {issue.description}\n"
-        static_findings_block += "\nPlease review the code context and the above static findings. Suggest deep solutions and expand on other logic, performance, style, or security issues not covered by these static analysis tools. Avoid duplicating these exact findings unless adding significantly more depth.\n"
+        static_findings_block += "\nPlease review the code context and the above static findings. Suggest deep solutions and expand on other issues not covered by these static analysis tools. Avoid duplicating these exact findings unless adding significantly more depth.\n"
 
     git_focus_block = ""
     if modified_lines:
@@ -71,6 +72,15 @@ def format_review_prompt(
             f"\n--- Git Modifications ---\n"
             f"IMPORTANT: Focus your review, issues, and code suggestions exclusively on the following modified/added line numbers: {sorted(list(modified_lines))}.\n"
             f"Ignore unmodified parts of the file unless they directly interface with or are broken by these new changes.\n"
+        )
+
+    focus_block = ""
+    if category_focus:
+        focus_block = (
+            f"\n--- Category Focus: {category_focus.upper()} ---\n"
+            f"CRITICAL: This audit is focused strictly on the category '{category_focus}'. "
+            f"Only identify and report issues that fall under this category. "
+            f"Do not report findings for style, formatting, performance or logic issues unless they directly trigger a '{category_focus}' issue.\n"
         )
 
     return f"""
@@ -90,7 +100,7 @@ Module-Level Functions:
 
 File Statistics:
 {stats_str}
-{static_findings_block}{git_focus_block}
+{static_findings_block}{git_focus_block}{focus_block}
 --- Source Code ---
 ```python
 {context.source_code}
@@ -98,4 +108,3 @@ File Statistics:
 
 Return your findings strictly in the requested JSON structure. Keep descriptions and explanations concise and direct. Do not repeat issues.
 """
-
