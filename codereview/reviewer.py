@@ -19,6 +19,9 @@ class Reviewer:
     def __init__(self, config: Optional[Config] = None):
         self.config = config or Config()
         self.provider = get_provider(self.config.default_provider, self.config)
+        from codereview.plugins import PluginManager
+        self.plugin_manager = PluginManager()
+        self.plugin_manager.load_plugins()
 
     def review_file(
         self, 
@@ -48,13 +51,32 @@ class Reviewer:
         parser = get_parser_for_file(abs_filepath)
         code_context = parser.parse_code(code_content, abs_filepath)
 
+        # Trigger plugin on_review_start hook
+        self.plugin_manager.on_review_start(code_context)
+
         # 2. Run deterministic static analysis
         static_issues = run_static_analysis(code_context)
+
+        # Run plugin custom analysers
+        for analyser in self.plugin_manager.get_analysers():
+            try:
+                static_issues.extend(analyser(code_context))
+            except Exception as e:
+                import sys
+                print(f"Warning: Custom analyser execution failed: {str(e)}", file=sys.stderr)
+
         if category_focus:
             static_issues = [i for i in static_issues if i.category.lower() == category_focus.lower()]
 
         # 3. Invoke LLM provider with CodeContext and static analysis findings
-        llm_result = self.provider.generate_review(code_context, static_issues, modified_lines, category_focus=category_focus)
+        prompt_modifier_fn = lambda p: self.plugin_manager.modify_prompt(code_context, p)
+        llm_result = self.provider.generate_review(
+            code_context, 
+            static_issues, 
+            modified_lines, 
+            category_focus=category_focus,
+            prompt_modifier=prompt_modifier_fn
+        )
 
         # 4. Merge static analysis issues with LLM issues
         combined_issues = static_issues + llm_result.issues
@@ -97,12 +119,15 @@ class Reviewer:
         new_score = self._recalculate_scores(llm_result.score, static_issues)
 
         # 7. Construct final ReviewResult
-        return ReviewResult(
+        # 7. Construct final ReviewResult
+        result = ReviewResult(
             summary=new_summary,
             score=new_score,
             issues=combined_issues,
             timestamp=llm_result.timestamp
         )
+        self.plugin_manager.on_review_end(code_context, result)
+        return result
 
     def review_dir(self, dirpath: str, category_focus: Optional[str] = None) -> RepositoryReviewResult:
         """

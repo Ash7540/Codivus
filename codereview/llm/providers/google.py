@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Callable
 from codereview.config import Config
 from codereview.llm.base import BaseLLMProvider
 from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
@@ -45,11 +45,14 @@ class GoogleProvider(BaseLLMProvider):
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
-        category_focus: Optional[str] = None
+        category_focus: Optional[str] = None,
+        prompt_modifier: Optional[Callable[[str], str]] = None
     ) -> ReviewResult:
         self._validate()
         
         user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
+        if prompt_modifier:
+            user_prompt = prompt_modifier(user_prompt)
         
         try:
             model = self.genai.GenerativeModel(

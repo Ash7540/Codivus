@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Callable
 from openai import OpenAI
 from codereview.config import Config
 from codereview.llm.base import BaseLLMProvider
@@ -19,12 +19,15 @@ class OpenAIProvider(BaseLLMProvider):
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
-        category_focus: Optional[str] = None
+        category_focus: Optional[str] = None,
+        prompt_modifier: Optional[Callable[[str], str]] = None
     ) -> ReviewResult:
         # Check API key before sending
         self.config.validate()
         
         user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
+        if prompt_modifier:
+            user_prompt = prompt_modifier(user_prompt)
 
         
         try:

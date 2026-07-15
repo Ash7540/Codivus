@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Callable
 from codereview.llm.base import BaseLLMProvider
 from codereview.models import ReviewResult, Summary, Score, Issue, Suggestion, CodeContext
 
@@ -12,7 +12,8 @@ class MockProvider(BaseLLMProvider):
         code_context: CodeContext, 
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
-        category_focus: Optional[str] = None
+        category_focus: Optional[str] = None,
+        prompt_modifier: Optional[Callable[[str], str]] = None
     ) -> ReviewResult:
 
         # Generate a dummy review result based on content
