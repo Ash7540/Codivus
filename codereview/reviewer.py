@@ -14,11 +14,17 @@ from codereview.models import (
 )
 from codereview.parsers import get_parser_for_file
 from codereview.analyzers import run_static_analysis
+from codereview.utils.logging import get_logger
+from codereview.utils.telemetry import time_operation
+from codereview.utils.cache import ReviewCache
+from codereview.exceptions import ParserError, StaticAnalysisError, LLMProviderError
 
 class Reviewer:
     def __init__(self, config: Optional[Config] = None):
         self.config = config or Config()
         self.provider = get_provider(self.config.default_provider, self.config)
+        self.logger = get_logger("codivus.reviewer")
+        self.cache = ReviewCache()
         from codereview.plugins import PluginManager
         self.plugin_manager = PluginManager()
         self.plugin_manager.load_plugins()
@@ -45,38 +51,55 @@ class Reviewer:
             with open(abs_filepath, "r", encoding="utf-8") as f:
                 code_content = f.read()
         except Exception as e:
-            raise RuntimeError(f"Failed to read file {abs_filepath}: {str(e)}")
+            raise ParserError(f"Failed to read file {abs_filepath}: {str(e)}")
 
         # 1. Parse file content into CodeContext
-        parser = get_parser_for_file(abs_filepath)
-        code_context = parser.parse_code(code_content, abs_filepath)
+        with time_operation("AST Parsing"):
+            try:
+                parser = get_parser_for_file(abs_filepath)
+                code_context = parser.parse_code(code_content, abs_filepath)
+            except Exception as e:
+                raise ParserError(f"AST parsing failed for {abs_filepath}: {str(e)}")
 
         # Trigger plugin on_review_start hook
         self.plugin_manager.on_review_start(code_context)
 
+        # Check Cache
+        cached_result = self.cache.get(abs_filepath, code_content, modified_lines, category_focus)
+        if cached_result:
+            self.plugin_manager.on_review_end(code_context, cached_result)
+            return cached_result
+
         # 2. Run deterministic static analysis
-        static_issues = run_static_analysis(code_context)
+        with time_operation("Static Analysis"):
+            try:
+                static_issues = run_static_analysis(code_context)
+            except Exception as e:
+                raise StaticAnalysisError(f"Static analysis failed for {abs_filepath}: {str(e)}")
 
         # Run plugin custom analysers
         for analyser in self.plugin_manager.get_analysers():
             try:
                 static_issues.extend(analyser(code_context))
             except Exception as e:
-                import sys
-                print(f"Warning: Custom analyser execution failed: {str(e)}", file=sys.stderr)
+                self.logger.warning(f"Plugin analyser failed: {str(e)}")
 
         if category_focus:
             static_issues = [i for i in static_issues if i.category.lower() == category_focus.lower()]
 
         # 3. Invoke LLM provider with CodeContext and static analysis findings
         prompt_modifier_fn = lambda p: self.plugin_manager.modify_prompt(code_context, p)
-        llm_result = self.provider.generate_review(
-            code_context, 
-            static_issues, 
-            modified_lines, 
-            category_focus=category_focus,
-            prompt_modifier=prompt_modifier_fn
-        )
+        with time_operation("LLM Generation"):
+            try:
+                llm_result = self.provider.generate_review(
+                    code_context, 
+                    static_issues, 
+                    modified_lines, 
+                    category_focus=category_focus,
+                    prompt_modifier=prompt_modifier_fn
+                )
+            except Exception as e:
+                raise LLMProviderError(f"LLM provider failed for {abs_filepath}: {str(e)}")
 
         # 4. Merge static analysis issues with LLM issues
         combined_issues = static_issues + llm_result.issues
@@ -119,7 +142,6 @@ class Reviewer:
         new_score = self._recalculate_scores(llm_result.score, static_issues)
 
         # 7. Construct final ReviewResult
-        # 7. Construct final ReviewResult
         result = ReviewResult(
             summary=new_summary,
             score=new_score,
@@ -127,6 +149,10 @@ class Reviewer:
             timestamp=llm_result.timestamp
         )
         self.plugin_manager.on_review_end(code_context, result)
+
+        # Cache result
+        self.cache.set(abs_filepath, code_content, result, modified_lines, category_focus)
+
         return result
 
     def review_dir(self, dirpath: str, category_focus: Optional[str] = None) -> RepositoryReviewResult:
