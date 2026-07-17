@@ -80,17 +80,20 @@ for issue in result.issues:
 ### CLI Command Suite
 
 ```bash
-# Review a single file
+# Initialize local environment configuration (.env file)
+codivus config init
+
+# Review a single file (defaults to 'review' subcommand if omitted)
 codivus review main.py
 
 # Review a directory recursively
-codivus repo review src/
+codivus repo src/
 
 # Run a dedicated security audit
-codivus security scan main.py
+codivus security main.py
 
-# Explain a code snippet using AI
-codivus explain "def hello(): pass"
+# Compare and review changes between Git refs (e.g. main and feature branch)
+codivus diff main...feature
 ```
 
 ---
