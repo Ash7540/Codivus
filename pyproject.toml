@@ -8,12 +8,26 @@ version = "0.1.1"
 description = "AI-powered Python library for automated code reviews"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+
+authors = [
+    { name = "Ashwin Ashok Chavan" }
+]
+
+license = { text = "MIT" }
+
+keywords = [
+    "ai",
+    "llm",
+    "code-review",
+    "developer-tools"
+]
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
 dependencies = [
     "openai>=1.0.0",
     "pydantic>=2.0.0",
@@ -41,5 +55,3 @@ include = ["codereview*"]
 
 [tool.setuptools.package-data]
 codereview = ["llm/templates/*.md"]
-
-
