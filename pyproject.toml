@@ -1,38 +1,31 @@
-[build-system]
-requires = ["setuptools>=61.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "codivus"
 version = "0.1.0"
 description = "AI-powered Python library for automated code reviews"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+
+authors = [
+    { name = "Ashwin Ashok Chavan" }
+]
+
+license = { text = "MIT" }
+
+keywords = [
+    "ai",
+    "llm",
+    "code-review",
+    "developer-tools"
+]
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
 dependencies = [
     "openai>=1.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
 ]
-
-[project.scripts]
-codivus = "codereview.cli.main:main"
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "ruff>=0.1.0",
-]
-anthropic = ["anthropic>=0.5.0"]
-google = ["google-generativeai>=0.3.0"]
-all-providers = [
-    "anthropic>=0.5.0",
-    "google-generativeai>=0.3.0",
-    "reportlab>=4.0.0",
-]
-
