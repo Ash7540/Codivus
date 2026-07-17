@@ -1,6 +1,5 @@
 import ast
 import os
-from typing import List, Optional
 from codereview.parsers.base import BaseParser
 from codereview.models.structure import (
     CodeContext,
@@ -9,6 +8,7 @@ from codereview.models.structure import (
     ClassInfo,
     FileStats,
 )
+
 
 class PythonParser(BaseParser):
     def parse_code(self, code_content: str, file_path: str) -> CodeContext:
@@ -37,20 +37,24 @@ class PythonParser(BaseParser):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for name_node in node.names:
-                    imports.append(ImportInfo(
-                        name=name_node.name,
-                        alias=name_node.asname,
-                        from_module=None,
-                        line_number=node.lineno,
-                    ))
+                    imports.append(
+                        ImportInfo(
+                            name=name_node.name,
+                            alias=name_node.asname,
+                            from_module=None,
+                            line_number=node.lineno,
+                        )
+                    )
             elif isinstance(node, ast.ImportFrom):
                 for name_node in node.names:
-                    imports.append(ImportInfo(
-                        name=name_node.name,
-                        alias=name_node.asname,
-                        from_module=node.module,
-                        line_number=node.lineno,
-                    ))
+                    imports.append(
+                        ImportInfo(
+                            name=name_node.name,
+                            alias=name_node.asname,
+                            from_module=node.module,
+                            line_number=node.lineno,
+                        )
+                    )
 
         # 2. Extract classes and functions (walk body for structural top-level declarations)
         functions = []
@@ -135,7 +139,9 @@ class PythonParser(BaseParser):
             bases=bases,
         )
 
-    def _calculate_basic_stats(self, code_content: str, num_functions: int, num_classes: int) -> FileStats:
+    def _calculate_basic_stats(
+        self, code_content: str, num_functions: int, num_classes: int
+    ) -> FileStats:
         lines = code_content.splitlines()
         total_lines = len(lines)
         blank_lines = 0

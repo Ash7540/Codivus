@@ -1,7 +1,6 @@
-import pytest
-import ast
 from codereview.parsers.python import PythonParser
 from codereview.style.pep8 import StyleAnalyzer
+
 
 def test_naming_conventions():
     code = """
@@ -24,23 +23,24 @@ def good_function_name(snake_case_param):
     context = parser.parse_code(code, "naming_test.py")
     analyzer = StyleAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     class_issues = [i for i in issues if "Class Name" in i.title]
     func_issues = [i for i in issues if "Function Name" in i.title]
     param_issues = [i for i in issues if "Parameter Name" in i.title]
     var_issues = [i for i in issues if "Variable Name" in i.title]
-    
+
     assert len(class_issues) == 1
     assert "bad_class_name" in class_issues[0].description
-    
+
     assert len(func_issues) == 1
     assert "BadFunctionName" in func_issues[0].description
-    
+
     assert len(param_issues) == 1
     assert "camelCaseParam" in param_issues[0].description
-    
+
     assert len(var_issues) == 1
     assert "badLocalVar" in var_issues[0].description
+
 
 def test_docstring_checks():
     # Module without docstring
@@ -69,14 +69,15 @@ def _private_func():
     context = parser.parse_code(code, "doc_test.py")
     analyzer = StyleAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     mod_issues = [i for i in issues if "Module Docstring" in i.title]
     class_issues = [i for i in issues if "Class Docstring" in i.title]
     func_issues = [i for i in issues if "Function Docstring" in i.title]
-    
+
     assert len(mod_issues) == 1
     assert len(class_issues) == 1
     assert len(func_issues) == 1
+
 
 def test_formatting_and_length():
     # Overly long function: > 50 lines
@@ -88,20 +89,20 @@ def overly_long_func():
 class ComplexClass:
 """ + "\n".join([f"    def method_{i}(self):\n        pass" for i in range(12)])
 
-    
     parser = PythonParser()
     context = parser.parse_code(code, "format_test.py")
     analyzer = StyleAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     len_issues = [i for i in issues if i.title == "Overly Long Function"]
     class_issues = [i for i in issues if i.title == "Overly Complex Class Design"]
-    
+
     assert len(len_issues) == 1
     assert "overly_long_func" in len_issues[0].description
-    
+
     assert len(class_issues) == 1
     assert "ComplexClass" in class_issues[0].description
+
 
 def test_python_best_practices():
     code = """
@@ -128,19 +129,19 @@ def check_identity(x):
     context = parser.parse_code(code, "bp_test.py")
     analyzer = StyleAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     mutable_issues = [i for i in issues if i.title == "Mutable Default Argument"]
     wildcard_issues = [i for i in issues if i.title == "Wildcard Import Detected"]
     identity_issues = [i for i in issues if i.title == "Literal Identity Comparison"]
-    
+
     # 2 parameters have mutable defaults (b and c)
     assert len(mutable_issues) == 2
     assert any("'b'" in i.description for i in mutable_issues)
     assert any("'c'" in i.description for i in mutable_issues)
-    
+
     assert len(wildcard_issues) == 1
     assert "os" in wildcard_issues[0].description
-    
+
     # 2 literal identity comparisons (is "abc" and is not 123)
     assert len(identity_issues) == 2
     assert any("is" in i.description for i in identity_issues)

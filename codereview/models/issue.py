@@ -2,6 +2,7 @@ from typing import Optional
 from pydantic import BaseModel
 from codereview.models.suggestion import Suggestion
 
+
 class Issue(BaseModel):
     title: str
     description: str

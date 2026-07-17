@@ -6,21 +6,25 @@ from codereview.llm.base import BaseLLMProvider
 from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
 from codereview.models import ReviewResult, CodeContext, Issue
 
+
 class AzureProvider(BaseLLMProvider):
     def __init__(self, config: Config):
         self.config = config
         self.api_key = os.getenv("AZURE_OPENAI_API_KEY")
         self.endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         self.api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
-        self.deployment_name = os.getenv("CODIVUS_MODEL") or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+        self.deployment_name = os.getenv("CODIVUS_MODEL") or os.getenv(
+            "AZURE_OPENAI_DEPLOYMENT_NAME"
+        )
         self.client = None
-        
+
         if self.api_key and self.endpoint:
             from openai import AzureOpenAI
+
             self.client = AzureOpenAI(
                 azure_endpoint=self.endpoint,
                 api_key=self.api_key,
-                api_version=self.api_version
+                api_version=self.api_version,
             )
 
     def _validate(self):
@@ -36,35 +40,38 @@ class AzureProvider(BaseLLMProvider):
             )
         if not self.client:
             from openai import AzureOpenAI
+
             self.client = AzureOpenAI(
                 azure_endpoint=self.endpoint,
                 api_key=self.api_key,
-                api_version=self.api_version
+                api_version=self.api_version,
             )
 
     def generate_review(
-        self, 
-        code_context: CodeContext, 
+        self,
+        code_context: CodeContext,
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
         category_focus: Optional[str] = None,
-        prompt_modifier: Optional[Callable[[str], str]] = None
+        prompt_modifier: Optional[Callable[[str], str]] = None,
     ) -> ReviewResult:
         self._validate()
-        
-        user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
+
+        user_prompt = format_review_prompt(
+            code_context, static_issues, modified_lines, category_focus
+        )
         if prompt_modifier:
             user_prompt = prompt_modifier(user_prompt)
-        
+
         try:
             completion = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=self.config.temperature,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             response_text = completion.choices[0].message.content
             data = json.loads(response_text)
@@ -77,10 +84,10 @@ class AzureProvider(BaseLLMProvider):
         folder_structure: str,
         dependency_map: Dict[str, List[str]],
         repo_issues: List[Issue],
-        file_summaries: List[str]
+        file_summaries: List[str],
     ) -> Dict[str, str]:
         self._validate()
-        
+
         prompt = f"""
 Analyze the following repository metadata and generate:
 1. A high-level executive summary of findings ('summary_text').
@@ -104,17 +111,22 @@ Return your output as a JSON object containing keys: 'summary_text' and 'archite
             completion = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
-                    {"role": "system", "content": "You are a repository analyzer. You MUST output ONLY a valid JSON object matching the requested schema."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a repository analyzer. You MUST output ONLY a valid JSON object matching the requested schema.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             response_text = completion.choices[0].message.content
             data = json.loads(response_text)
             return {
                 "summary_text": data.get("summary_text", "No summary generated."),
-                "architecture_overview": data.get("architecture_overview", "No architecture overview generated.")
+                "architecture_overview": data.get(
+                    "architecture_overview", "No architecture overview generated."
+                ),
             }
         except Exception as e:
             raise RuntimeError(f"Azure OpenAI API call failed: {str(e)}")

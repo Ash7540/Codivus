@@ -7,19 +7,22 @@ from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
 from codereview.models import ReviewResult, CodeContext, Issue
 
 try:
-    import anthropic
+    import anthropic  # noqa: F401
+
     HAS_ANTHROPIC = True
 except ImportError:
     HAS_ANTHROPIC = False
+
 
 class AnthropicProvider(BaseLLMProvider):
     def __init__(self, config: Config):
         self.config = config
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.model = os.getenv("CODIVUS_MODEL", "claude-3-5-sonnet-20240620")
-        
+
         if HAS_ANTHROPIC and self.api_key:
             import anthropic
+
             self.client = anthropic.Anthropic(api_key=self.api_key)
         else:
             self.client = None
@@ -46,19 +49,24 @@ class AnthropicProvider(BaseLLMProvider):
         return text.strip()
 
     def generate_review(
-        self, 
-        code_context: CodeContext, 
+        self,
+        code_context: CodeContext,
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
         category_focus: Optional[str] = None,
-        prompt_modifier: Optional[Callable[[str], str]] = None
+        prompt_modifier: Optional[Callable[[str], str]] = None,
     ) -> ReviewResult:
         self._validate()
-        
-        user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
+
+        user_prompt = format_review_prompt(
+            code_context, static_issues, modified_lines, category_focus
+        )
         if prompt_modifier:
             user_prompt = prompt_modifier(user_prompt)
-        system_instruction = SYSTEM_PROMPT + "\nCRITICAL: Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown tags or include any explanation outside the JSON."
+        system_instruction = (
+            SYSTEM_PROMPT
+            + "\nCRITICAL: Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown tags or include any explanation outside the JSON."
+        )
 
         try:
             message = self.client.messages.create(
@@ -66,9 +74,7 @@ class AnthropicProvider(BaseLLMProvider):
                 max_tokens=4000,
                 temperature=self.config.temperature,
                 system=system_instruction,
-                messages=[
-                    {"role": "user", "content": user_prompt}
-                ]
+                messages=[{"role": "user", "content": user_prompt}],
             )
             response_text = self._clean_json_response(message.content[0].text)
             data = json.loads(response_text)
@@ -81,10 +87,10 @@ class AnthropicProvider(BaseLLMProvider):
         folder_structure: str,
         dependency_map: Dict[str, List[str]],
         repo_issues: List[Issue],
-        file_summaries: List[str]
+        file_summaries: List[str],
     ) -> Dict[str, str]:
         self._validate()
-        
+
         prompt = f"""
 Analyze the following repository metadata and generate:
 1. A high-level executive summary of findings ('summary_text').
@@ -112,15 +118,15 @@ Return your output as a JSON object containing keys: 'summary_text' and 'archite
                 max_tokens=2000,
                 temperature=0.2,
                 system=system_instruction,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
             response_text = self._clean_json_response(message.content[0].text)
             data = json.loads(response_text)
             return {
                 "summary_text": data.get("summary_text", "No summary generated."),
-                "architecture_overview": data.get("architecture_overview", "No architecture overview generated.")
+                "architecture_overview": data.get(
+                    "architecture_overview", "No architecture overview generated."
+                ),
             }
         except Exception as e:
             raise RuntimeError(f"Anthropic API call failed: {str(e)}")

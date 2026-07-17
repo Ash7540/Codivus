@@ -1,5 +1,6 @@
 import json
-from codereview.models import ReviewResult, RepositoryReviewResult
+from codereview.models import RepositoryReviewResult
+
 
 def map_severity_to_sarif_level(severity: str) -> str:
     sev = severity.lower()
@@ -9,6 +10,7 @@ def map_severity_to_sarif_level(severity: str) -> str:
         return "warning"
     else:
         return "note"
+
 
 def map_category_to_rule_id(category: str) -> str:
     cat = category.lower()
@@ -21,72 +23,79 @@ def map_category_to_rule_id(category: str) -> str:
     else:
         return "COD-BUG"
 
+
 def export_sarif(result, filepath: str) -> None:
     is_repo = isinstance(result, RepositoryReviewResult)
-    
+
     # Declare rules
     rules = [
         {
             "id": "COD-SEC",
             "name": "SecurityVulnerability",
-            "shortDescription": {"text": "Security vulnerability identified by Codivus."}
+            "shortDescription": {
+                "text": "Security vulnerability identified by Codivus."
+            },
         },
         {
             "id": "COD-PERF",
             "name": "PerformanceIssue",
-            "shortDescription": {"text": "Performance bottleneck or inefficient pattern."}
+            "shortDescription": {
+                "text": "Performance bottleneck or inefficient pattern."
+            },
         },
         {
             "id": "COD-STYLE",
             "name": "StyleViolation",
-            "shortDescription": {"text": "Coding style standard or PEP 8 violation."}
+            "shortDescription": {"text": "Coding style standard or PEP 8 violation."},
         },
         {
             "id": "COD-BUG",
             "name": "LogicalBug",
-            "shortDescription": {"text": "Logical bug, complexity warning, or cross-file issue."}
-        }
+            "shortDescription": {
+                "text": "Logical bug, complexity warning, or cross-file issue."
+            },
+        },
     ]
-    
+
     sarif_results = []
-    
+
     # Process issues
     if is_repo:
         # 1. Process repository-level issues
         for issue in result.repo_issues:
             rule_id = map_category_to_rule_id(issue.category)
             level = map_severity_to_sarif_level(issue.severity)
-            
+
             sarif_result = {
                 "ruleId": rule_id,
                 "level": level,
                 "message": {"text": f"{issue.title}: {issue.description}"},
-                "locations": []
+                "locations": [],
             }
             sarif_results.append(sarif_result)
-            
+
         # 2. Process file-level issues
         for rel_file, f_res in result.file_reviews.items():
             for issue in f_res.issues:
                 rule_id = map_category_to_rule_id(issue.category)
                 level = map_severity_to_sarif_level(issue.severity)
-                
+
                 location = {
                     "physicalLocation": {
                         "artifactLocation": {"uri": rel_file},
                     }
                 }
-                
+
                 if issue.line_number and issue.line_number > 0:
                     location["physicalLocation"]["region"] = {
                         "startLine": issue.line_number
                     }
-                    
+
                 sarif_result = {
                     "ruleId": rule_id,
                     "level": level,
                     "message": {"text": f"{issue.title}: {issue.description}"},
-                    "locations": [location]
+                    "locations": [location],
                 }
                 sarif_results.append(sarif_result)
     else:
@@ -98,26 +107,26 @@ def export_sarif(result, filepath: str) -> None:
         for issue in result.issues:
             rule_id = map_category_to_rule_id(issue.category)
             level = map_severity_to_sarif_level(issue.severity)
-            
+
             location = {
                 "physicalLocation": {
                     "artifactLocation": {"uri": filename},
                 }
             }
-            
+
             if issue.line_number and issue.line_number > 0:
                 location["physicalLocation"]["region"] = {
                     "startLine": issue.line_number
                 }
-                
+
             sarif_result = {
                 "ruleId": rule_id,
                 "level": level,
                 "message": {"text": f"{issue.title}: {issue.description}"},
-                "locations": [location]
+                "locations": [location],
             }
             sarif_results.append(sarif_result)
-            
+
     # Complete SARIF structure
     sarif_log = {
         "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.5.json",
@@ -129,13 +138,13 @@ def export_sarif(result, filepath: str) -> None:
                         "name": "Codivus",
                         "version": "0.1.0",
                         "informationUri": "https://github.com/Ash7540/Codivus",
-                        "rules": rules
+                        "rules": rules,
                     }
                 },
-                "results": sarif_results
+                "results": sarif_results,
             }
-        ]
+        ],
     }
-    
+
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(sarif_log, f, indent=2)

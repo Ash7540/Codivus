@@ -1,25 +1,33 @@
 from datetime import datetime
 from typing import List, Optional, Set, Callable
 from codereview.llm.base import BaseLLMProvider
-from codereview.models import ReviewResult, Summary, Score, Issue, Suggestion, CodeContext
+from codereview.models import (
+    ReviewResult,
+    Summary,
+    Score,
+    Issue,
+    Suggestion,
+    CodeContext,
+)
+
 
 class MockProvider(BaseLLMProvider):
     def __init__(self, config):
         self.config = config
 
     def generate_review(
-        self, 
-        code_context: CodeContext, 
+        self,
+        code_context: CodeContext,
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
         category_focus: Optional[str] = None,
-        prompt_modifier: Optional[Callable[[str], str]] = None
+        prompt_modifier: Optional[Callable[[str], str]] = None,
     ) -> ReviewResult:
 
         # Generate a dummy review result based on content
-        lines = code_context.source_code.split('\n')
+        lines = code_context.source_code.split("\n")
         first_line = lines[0] if lines else ""
-        
+
         return ReviewResult(
             summary=Summary(
                 total_issues=1,
@@ -27,13 +35,13 @@ class MockProvider(BaseLLMProvider):
                 high_issues=0,
                 medium_issues=0,
                 low_issues=1,
-                summary_text="Mock review completed successfully. One mock styling issue found."
+                summary_text="Mock review completed successfully. One mock styling issue found.",
             ),
             score=Score(
                 overall_score=85.0,
                 security_score=100.0,
                 performance_score=90.0,
-                style_score=65.0
+                style_score=65.0,
             ),
             issues=[
                 Issue(
@@ -46,11 +54,11 @@ class MockProvider(BaseLLMProvider):
                     suggestion=Suggestion(
                         original_code=first_line,
                         proposed_code=f"# Verified: {first_line}",
-                        explanation="This is a dummy improvement suggestion."
-                    )
+                        explanation="This is a dummy improvement suggestion.",
+                    ),
                 )
             ],
-            timestamp=datetime.utcnow().isoformat() + "Z"
+            timestamp=datetime.utcnow().isoformat() + "Z",
         )
 
     def generate_repo_summary(
@@ -58,10 +66,9 @@ class MockProvider(BaseLLMProvider):
         folder_structure: str,
         dependency_map: dict,
         repo_issues: List[Issue],
-        file_summaries: List[str]
+        file_summaries: List[str],
     ) -> dict:
         return {
             "summary_text": "Mock repository review summary completed successfully. Analyzed overall folder structure and mapped code dependencies.",
-            "architecture_overview": "Mock Architecture Overview: The repository is organized as a standard python package. Files are modular and import relationships are clean."
+            "architecture_overview": "Mock Architecture Overview: The repository is organized as a standard python package. Files are modular and import relationships are clean.",
         }
-

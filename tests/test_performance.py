@@ -1,7 +1,6 @@
-import pytest
-import ast
 from codereview.parsers.python import PythonParser
 from codereview.performance.profiler import PerformanceAnalyzer
+
 
 def test_loop_performance():
     code = """
@@ -29,17 +28,18 @@ def process_data(items):
     context = parser.parse_code(code, "loop_test.py")
     analyzer = PerformanceAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     concat_issues = [i for i in issues if i.title == "String Concatenation in Loop"]
     expensive_issues = [i for i in issues if i.title == "Expensive Operation in Loop"]
-    
+
     assert len(concat_issues) == 1
     assert concat_issues[0].severity == "medium"
     assert "res" in concat_issues[0].description
-    
+
     assert len(expensive_issues) == 2
     assert any("Database" in i.description for i in expensive_issues)
     assert any("HTTP" in i.description for i in expensive_issues)
+
 
 def test_memory_performance():
     code = """
@@ -62,16 +62,19 @@ def file_and_agg():
     context = parser.parse_code(code, "mem_test.py")
     analyzer = PerformanceAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     read_issues = [i for i in issues if i.title == "Memory-Inefficient File Read"]
-    agg_issues = [i for i in issues if i.title == "Unnecessary List Comprehension in Aggregation"]
-    
+    agg_issues = [
+        i for i in issues if i.title == "Unnecessary List Comprehension in Aggregation"
+    ]
+
     assert len(read_issues) == 1
     assert read_issues[0].severity == "medium"
-    
+
     assert len(agg_issues) == 1
     assert agg_issues[0].severity == "medium"
     assert "sum" in agg_issues[0].description
+
 
 def test_async_performance():
     code = """
@@ -97,16 +100,19 @@ async def main_async(tasks):
     context = parser.parse_code(code, "async_test.py")
     analyzer = PerformanceAnalyzer()
     issues = analyzer.analyze(context)
-    
-    blocking_issues = [i for i in issues if i.title == "Blocking Call in Async Function"]
+
+    blocking_issues = [
+        i for i in issues if i.title == "Blocking Call in Async Function"
+    ]
     seq_issues = [i for i in issues if i.title == "Sequential Await in Loop"]
-    
+
     assert len(blocking_issues) == 2
     assert any("time.sleep" in i.description for i in blocking_issues)
     assert any("blocking sync call" in i.description for i in blocking_issues)
-    
+
     assert len(seq_issues) == 1
     assert seq_issues[0].severity == "medium"
+
 
 def test_membership_performance():
     code = """
@@ -126,9 +132,9 @@ def test_search():
     context = parser.parse_code(code, "search_test.py")
     analyzer = PerformanceAnalyzer()
     issues = analyzer.analyze(context)
-    
+
     member_issues = [i for i in issues if i.title == "Membership Check on List"]
-    
+
     assert len(member_issues) == 1
     assert member_issues[0].severity == "low"
     assert "my_list" in member_issues[0].description

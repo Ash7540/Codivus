@@ -10,6 +10,7 @@ from codereview.security.injection import detect_code_injection
 from codereview.security.rules import detect_weak_cryptography
 from codereview.security.xss import detect_xss_vulns
 
+
 class SecurityAnalyzer(BaseAnalyzer):
     def analyze(self, context: CodeContext) -> List[Issue]:
         issues: List[Issue] = []

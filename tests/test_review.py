@@ -1,16 +1,14 @@
-import os
 import pytest
 from unittest.mock import MagicMock, patch
 from codereview.config import Config
 from codereview.reviewer import Reviewer
 from codereview.models import ReviewResult, Summary, Score, Issue, Suggestion
 
+
 def test_models_structure():
     # Verify we can instantiate all Pydantic models with dummy data
     suggestion = Suggestion(
-        original_code="x = 1",
-        proposed_code="x: int = 1",
-        explanation="Add type hint"
+        original_code="x = 1", proposed_code="x: int = 1", explanation="Add type hint"
     )
     issue = Issue(
         title="Missing type hint",
@@ -19,13 +17,13 @@ def test_models_structure():
         category="style",
         line_number=1,
         code_snippet="x = 1",
-        suggestion=suggestion
+        suggestion=suggestion,
     )
     score = Score(
         overall_score=90.0,
         security_score=100.0,
         performance_score=100.0,
-        style_score=70.0
+        style_score=70.0,
     )
     summary = Summary(
         total_issues=1,
@@ -33,13 +31,10 @@ def test_models_structure():
         high_issues=0,
         medium_issues=0,
         low_issues=1,
-        summary_text="One styling issue found."
+        summary_text="One styling issue found.",
     )
     review_result = ReviewResult(
-        summary=summary,
-        score=score,
-        issues=[issue],
-        timestamp="2026-07-03T12:00:00Z"
+        summary=summary, score=score, issues=[issue], timestamp="2026-07-03T12:00:00Z"
     )
 
     assert review_result.summary.total_issues == 1
@@ -53,7 +48,7 @@ def test_models_structure():
 def test_config_defaults(mock_getenv, mock_load_dotenv):
     # Setup getenv mock to respect standard default fallback argument
     mock_getenv.side_effect = lambda key, default=None: default
-    
+
     config = Config()
     assert config.default_provider == "openai"
     assert config.default_model == "gpt-4o-mini"
@@ -63,12 +58,14 @@ def test_config_defaults(mock_getenv, mock_load_dotenv):
 
 @patch("codereview.config.load_dotenv")
 def test_config_overrides(mock_load_dotenv):
-    config = Config({
-        "openai_api_key": "test_key",
-        "default_provider": "google",
-        "default_model": "gemini-2.5-flash",
-        "temperature": 0.5
-    })
+    config = Config(
+        {
+            "openai_api_key": "test_key",
+            "default_provider": "google",
+            "default_model": "gemini-2.5-flash",
+            "temperature": 0.5,
+        }
+    )
     assert config.openai_api_key == "test_key"
     assert config.default_provider == "google"
     assert config.default_model == "gemini-2.5-flash"
@@ -92,7 +89,7 @@ def test_reviewer_success(mock_openai_class, tmp_path):
     # Setup mock client behavior
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
-    
+
     # Create structured output mock
     mock_parsed_result = ReviewResult(
         summary=Summary(
@@ -101,34 +98,31 @@ def test_reviewer_success(mock_openai_class, tmp_path):
             high_issues=0,
             medium_issues=0,
             low_issues=0,
-            summary_text="No issues found."
+            summary_text="No issues found.",
         ),
         score=Score(
             overall_score=100.0,
             security_score=100.0,
             performance_score=100.0,
-            style_score=100.0
+            style_score=100.0,
         ),
         issues=[],
-        timestamp="2026-07-03T12:00:00Z"
+        timestamp="2026-07-03T12:00:00Z",
     )
-    
+
     mock_completion = MagicMock()
-    mock_completion.choices = [
-        MagicMock(message=MagicMock(parsed=mock_parsed_result))
-    ]
+    mock_completion.choices = [MagicMock(message=MagicMock(parsed=mock_parsed_result))]
     mock_client.beta.chat.completions.parse.return_value = mock_completion
-    
+
     # Create a temporary file to review
     test_file = tmp_path / "test.py"
     test_file.write_text('"""Module docstring."""\nprint("hello")\n', encoding="utf-8")
 
-    
     # Initialize and run reviewer
     config = Config({"openai_api_key": "fake_key"})
     reviewer = Reviewer(config)
     result = reviewer.review_file(str(test_file))
-    
+
     assert isinstance(result, ReviewResult)
     assert result.score.overall_score == 100.0
     assert len(result.issues) == 0

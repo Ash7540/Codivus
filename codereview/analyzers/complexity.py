@@ -3,6 +3,7 @@ from typing import List
 from codereview.analyzers.base import BaseAnalyzer
 from codereview.models import Issue, Suggestion, CodeContext
 
+
 class ComplexityVisitor(ast.NodeVisitor):
     def __init__(self):
         self.complexity = 1
@@ -51,6 +52,7 @@ class ComplexityVisitor(ast.NodeVisitor):
         # Stop traversal so nested classes are not traversed
         pass
 
+
 class ComplexityAnalyzer(BaseAnalyzer):
     def __init__(self, threshold: int = 10):
         self.threshold = threshold
@@ -71,33 +73,37 @@ class ComplexityAnalyzer(BaseAnalyzer):
                 # Manually traverse children of the function node (skipping the function node itself so visitor doesn't block immediately)
                 for child in node.body:
                     visitor.visit(child)
-                
+
                 complexity = visitor.complexity
-                
+
                 # Check threshold
                 if complexity > self.threshold:
                     severity = "high" if complexity > 15 else "medium"
-                    
+
                     # Extract the definition line for code snippet
                     lines = context.source_code.splitlines()
-                    snippet = lines[node.lineno - 1] if 0 < node.lineno <= len(lines) else ""
-                    
-                    issues.append(Issue(
-                        title="High Cyclomatic Complexity",
-                        description=(
-                            f"Function '{node.name}' has a cyclomatic complexity of {complexity}, "
-                            f"which exceeds the recommended threshold of {self.threshold}. "
-                            f"High complexity makes functions harder to read, maintain, and test."
-                        ),
-                        severity=severity,
-                        category="style",
-                        line_number=node.lineno,
-                        code_snippet=snippet.strip(),
-                        suggestion=Suggestion(
-                            original_code=snippet,
-                            proposed_code=f"# Consider refactoring {node.name} into smaller helper functions.",
-                            explanation="Refactoring high-complexity functions increases maintainability and readability."
+                    snippet = (
+                        lines[node.lineno - 1] if 0 < node.lineno <= len(lines) else ""
+                    )
+
+                    issues.append(
+                        Issue(
+                            title="High Cyclomatic Complexity",
+                            description=(
+                                f"Function '{node.name}' has a cyclomatic complexity of {complexity}, "
+                                f"which exceeds the recommended threshold of {self.threshold}. "
+                                f"High complexity makes functions harder to read, maintain, and test."
+                            ),
+                            severity=severity,
+                            category="style",
+                            line_number=node.lineno,
+                            code_snippet=snippet.strip(),
+                            suggestion=Suggestion(
+                                original_code=snippet,
+                                proposed_code=f"# Consider refactoring {node.name} into smaller helper functions.",
+                                explanation="Refactoring high-complexity functions increases maintainability and readability.",
+                            ),
                         )
-                    ))
-        
+                    )
+
         return issues

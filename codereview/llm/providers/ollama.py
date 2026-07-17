@@ -8,56 +8,61 @@ from codereview.llm.base import BaseLLMProvider
 from codereview.llm.prompts import SYSTEM_PROMPT, format_review_prompt
 from codereview.models import ReviewResult, CodeContext, Issue
 
+
 class OllamaProvider(BaseLLMProvider):
     def __init__(self, config: Config):
         self.config = config
-        self.host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip('/')
+        self.host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
         self.model = os.getenv("CODIVUS_MODEL") or os.getenv("OLLAMA_MODEL", "llama3")
 
-    def _query_ollama(self, system_instruction: str, user_prompt: str, temperature: float) -> str:
+    def _query_ollama(
+        self, system_instruction: str, user_prompt: str, temperature: float
+    ) -> str:
         url = f"{self.host}/api/chat"
         payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ],
             "stream": False,
-            "options": {
-                "temperature": temperature
-            },
-            "format": "json"
+            "options": {"temperature": temperature},
+            "format": "json",
         }
-        
+
         headers = {"Content-Type": "application/json"}
         req_data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=req_data, headers=headers, method="POST")
-        
+
         try:
             with urllib.request.urlopen(req, timeout=120) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 return res_data["message"]["content"]
         except urllib.error.URLError as e:
-            raise RuntimeError(f"Failed to connect to local Ollama server at {self.host}: {str(e.reason)}")
+            raise RuntimeError(
+                f"Failed to connect to local Ollama server at {self.host}: {str(e.reason)}"
+            )
         except Exception as e:
             raise RuntimeError(f"Ollama execution failed: {str(e)}")
 
     def generate_review(
-        self, 
-        code_context: CodeContext, 
+        self,
+        code_context: CodeContext,
         static_issues: Optional[List[Issue]] = None,
         modified_lines: Optional[Set[int]] = None,
         category_focus: Optional[str] = None,
-        prompt_modifier: Optional[Callable[[str], str]] = None
+        prompt_modifier: Optional[Callable[[str], str]] = None,
     ) -> ReviewResult:
-        user_prompt = format_review_prompt(code_context, static_issues, modified_lines, category_focus)
+        user_prompt = format_review_prompt(
+            code_context, static_issues, modified_lines, category_focus
+        )
         if prompt_modifier:
             user_prompt = prompt_modifier(user_prompt)
-        
+
         response_text = self._query_ollama(
             system_instruction=SYSTEM_PROMPT,
             user_prompt=user_prompt,
-            temperature=self.config.temperature
+            temperature=self.config.temperature,
         )
         data = json.loads(response_text.strip())
         return ReviewResult.model_validate(data)
@@ -67,7 +72,7 @@ class OllamaProvider(BaseLLMProvider):
         folder_structure: str,
         dependency_map: Dict[str, List[str]],
         repo_issues: List[Issue],
-        file_summaries: List[str]
+        file_summaries: List[str],
     ) -> Dict[str, str]:
         prompt = f"""
 Analyze the following repository metadata and generate:
@@ -91,10 +96,12 @@ Return your output as a JSON object containing keys: 'summary_text' and 'archite
         response_text = self._query_ollama(
             system_instruction="You are a repository analyzer. You MUST output ONLY a valid JSON object matching the requested schema.",
             user_prompt=prompt,
-            temperature=0.2
+            temperature=0.2,
         )
         data = json.loads(response_text.strip())
         return {
             "summary_text": data.get("summary_text", "No summary generated."),
-            "architecture_overview": data.get("architecture_overview", "No architecture overview generated.")
+            "architecture_overview": data.get(
+                "architecture_overview", "No architecture overview generated."
+            ),
         }

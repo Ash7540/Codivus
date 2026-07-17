@@ -2,7 +2,8 @@ import os
 from codereview.config import Config
 from codereview.reviewer import Reviewer
 from codereview.plugins import BasePlugin
-from codereview.models import Issue, Suggestion
+from codereview.models import Issue
+
 
 # 1. Define custom plugin class
 class TodolistTrackerPlugin(BasePlugin):
@@ -15,24 +16,28 @@ class TodolistTrackerPlugin(BasePlugin):
             issues = []
             for line_idx, line in enumerate(context.source_code.splitlines(), start=1):
                 if "TODO" in line:
-                    issues.append(Issue(
-                        title="Unresolved TODO Comment",
-                        description=f"Plugin tracked a TODO comment: '{line.strip()}'",
-                        severity="low",
-                        category="style",
-                        line_number=line_idx,
-                        code_snippet=line,
-                        suggestion=None
-                    ))
+                    issues.append(
+                        Issue(
+                            title="Unresolved TODO Comment",
+                            description=f"Plugin tracked a TODO comment: '{line.strip()}'",
+                            severity="low",
+                            category="style",
+                            line_number=line_idx,
+                            code_snippet=line,
+                            suggestion=None,
+                        )
+                    )
             return issues
+
         return [todo_analyser]
 
     def modify_prompt(self, context, prompt: str) -> str:
         return prompt + "\nNOTE: Keep reviews concise. Focus heavily on cleanliness."
 
+
 def main():
     print("=== Pipeline Plugin Setup Example ===")
-    
+
     # 2. Write a dummy script with TODO comments
     sample_code = """
 def process_data(data):
@@ -43,21 +48,21 @@ def process_data(data):
     temp_file = "temp_sample_todo.py"
     with open(temp_file, "w", encoding="utf-8") as f:
         f.write(sample_code.strip())
-        
+
     print(f"Created target script '{temp_file}' containing unresolved TODOs.")
 
     try:
         # 3. Setup reviewer with mock provider
         config = Config(overrides={"default_provider": "mock"})
         reviewer = Reviewer(config)
-        
+
         # 4. Programmatically register custom plugin
         reviewer.plugin_manager.register_plugin(TodolistTrackerPlugin())
         print("Registered 'todo_list_tracker' plugin successfully.")
-        
+
         # 5. Run review
         result = reviewer.review_file(temp_file)
-        
+
         # 6. Verify custom plugin findings
         todo_issues = [i for i in result.issues if "TODO" in i.title]
         print(f"\nTotal Issues Discovered: {len(result.issues)}")
@@ -70,6 +75,7 @@ def process_data(data):
         if os.path.exists(temp_file):
             os.remove(temp_file)
             print(f"Cleaned up temporary target '{temp_file}'.")
+
 
 if __name__ == "__main__":
     main()

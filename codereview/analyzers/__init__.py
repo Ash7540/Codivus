@@ -9,6 +9,7 @@ from codereview.security import SecurityAnalyzer
 from codereview.performance import PerformanceAnalyzer
 from codereview.style import StyleAnalyzer
 
+
 def run_static_analysis(context: CodeContext) -> List[Issue]:
     """
     Executes all static analyzers on the provided CodeContext and returns aggregated issues.
@@ -22,7 +23,7 @@ def run_static_analysis(context: CodeContext) -> List[Issue]:
         PerformanceAnalyzer(),
         StyleAnalyzer(),
     ]
-    
+
     all_issues = []
     for analyzer in analyzers:
         try:
@@ -30,9 +31,14 @@ def run_static_analysis(context: CodeContext) -> List[Issue]:
             all_issues.extend(issues)
         except Exception as e:
             import sys
-            print(f"Error in analyzer {analyzer.__class__.__name__}: {str(e)}", file=sys.stderr)
-            
+
+            print(
+                f"Error in analyzer {analyzer.__class__.__name__}: {str(e)}",
+                file=sys.stderr,
+            )
+
     return all_issues
+
 
 __all__ = [
     "BaseAnalyzer",

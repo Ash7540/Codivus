@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Callable
 from codereview.models import CodeContext, Issue, ReviewResult
 
+
 class BasePlugin(ABC):
     @property
     @abstractmethod

@@ -24,17 +24,23 @@ Also, calculate quality scores (0 to 100) for overall, security, performance, an
 Finally, compile a summary of findings.
 """
 
+
 def format_review_prompt(
-    context: CodeContext, 
-    static_issues: Optional[List[Issue]] = None, 
+    context: CodeContext,
+    static_issues: Optional[List[Issue]] = None,
     modified_lines: Optional[Set[int]] = None,
-    category_focus: Optional[str] = None
+    category_focus: Optional[str] = None,
 ) -> str:
     # Build structural outline
-    imports_str = "\n".join([
-        f"  - {imp.from_module + '.' if imp.from_module else ''}{imp.name}"
-        for imp in context.imports
-    ]) or "  - None"
+    imports_str = (
+        "\n".join(
+            [
+                f"  - {imp.from_module + '.' if imp.from_module else ''}{imp.name}"
+                for imp in context.imports
+            ]
+        )
+        or "  - None"
+    )
 
     classes_str = ""
     for cls in context.classes:
@@ -42,13 +48,18 @@ def format_review_prompt(
         classes_str += f"  - Class `{cls.name}{bases_str}` (Lines {cls.start_line}-{cls.end_line})\n"
         for method in cls.methods:
             classes_str += f"    - Method `{method.name}({', '.join(method.args)})` (Lines {method.start_line}-{method.end_line})\n"
-            
+
     classes_str = classes_str.strip() or "  - None"
 
-    functions_str = "\n".join([
-        f"  - Function `{func.name}({', '.join(func.args)})` (Lines {func.start_line}-{func.end_line})"
-        for func in context.functions
-    ]) or "  - None"
+    functions_str = (
+        "\n".join(
+            [
+                f"  - Function `{func.name}({', '.join(func.args)})` (Lines {func.start_line}-{func.end_line})"
+                for func in context.functions
+            ]
+        )
+        or "  - None"
+    )
 
     stats_str = (
         f"  - Lines of Code (LOC): {context.stats.loc}\n"

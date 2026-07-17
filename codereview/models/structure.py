@@ -1,11 +1,13 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
+
 class ImportInfo(BaseModel):
     name: str
     alias: Optional[str] = None
     from_module: Optional[str] = None
     line_number: int
+
 
 class FunctionInfo(BaseModel):
     name: str
@@ -15,6 +17,7 @@ class FunctionInfo(BaseModel):
     args: List[str]
     complexity: int = 1  # default to 1
 
+
 class ClassInfo(BaseModel):
     name: str
     docstring: Optional[str] = None
@@ -23,12 +26,14 @@ class ClassInfo(BaseModel):
     methods: List[FunctionInfo]
     bases: List[str]
 
+
 class FileStats(BaseModel):
     loc: int
     comment_lines: int
     blank_lines: int
     num_functions: int
     num_classes: int
+
 
 class CodeContext(BaseModel):
     file_path: str

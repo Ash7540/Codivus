@@ -8,6 +8,7 @@ from codereview.style.comments import detect_missing_comments
 from codereview.style.formatting import detect_formatting_violations
 from codereview.style.best_practices import detect_best_practice_violations
 
+
 class StyleAnalyzer(BaseAnalyzer):
     def analyze(self, context: CodeContext) -> List[Issue]:
         issues: List[Issue] = []

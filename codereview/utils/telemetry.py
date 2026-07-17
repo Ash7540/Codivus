@@ -5,6 +5,7 @@ from codereview.utils.logging import get_logger
 
 logger = get_logger("codivus.telemetry")
 
+
 @contextmanager
 def time_operation(operation_name: str) -> Generator[None, None, None]:
     start_time = time.perf_counter()
@@ -13,4 +14,6 @@ def time_operation(operation_name: str) -> Generator[None, None, None]:
     finally:
         end_time = time.perf_counter()
         duration = end_time - start_time
-        logger.info(f"Operation '{operation_name}' completed in {duration:.4f} seconds.")
+        logger.info(
+            f"Operation '{operation_name}' completed in {duration:.4f} seconds."
+        )

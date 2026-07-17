@@ -10,6 +10,7 @@ from codereview.llm.providers import (
     AzureProvider,
 )
 
+
 def get_provider(provider_name: str, config: Config) -> BaseLLMProvider:
     provider_name_lower = provider_name.lower()
     if provider_name_lower == "openai":

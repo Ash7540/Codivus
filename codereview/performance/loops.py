@@ -2,6 +2,7 @@ import ast
 from typing import List
 from codereview.models import Issue, Suggestion
 
+
 class LoopPerformanceVisitor(ast.NodeVisitor):
     def __init__(self, source_lines: List[str]):
         self.source_lines = source_lines
@@ -15,9 +16,9 @@ class LoopPerformanceVisitor(ast.NodeVisitor):
         if isinstance(node, ast.JoinedStr):
             return True
         if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == 'str':
+            if isinstance(node.func, ast.Name) and node.func.id == "str":
                 return True
-            if isinstance(node.func, ast.Attribute) and node.func.attr == 'format':
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "format":
                 return True
         return False
 
@@ -51,14 +52,87 @@ class LoopPerformanceVisitor(ast.NodeVisitor):
 
                 if is_string:
                     lineno = node.lineno
-                    snippet = self.source_lines[lineno - 1] if 0 < lineno <= len(self.source_lines) else ""
-                    self.issues.append(Issue(
-                        title="String Concatenation in Loop",
+                    snippet = (
+                        self.source_lines[lineno - 1]
+                        if 0 < lineno <= len(self.source_lines)
+                        else ""
+                    )
+                    self.issues.append(
+                        Issue(
+                            title="String Concatenation in Loop",
+                            description=(
+                                f"String accumulation using '+=' on variable '{node.target.id}' detected inside a loop. "
+                                "Strings in Python are immutable; concatenating them in a loop creates a new copy of the string "
+                                "in each iteration, resulting in O(N^2) time complexity. "
+                                "Instead, append strings to a list and use ''.join(list) after the loop."
+                            ),
+                            severity="medium",
+                            category="performance",
+                            line_number=lineno,
+                            code_snippet=snippet.strip(),
+                            suggestion=Suggestion(
+                                original_code=snippet,
+                                proposed_code=f"parts = []\nfor ...:\n    parts.append(...)\n{node.target.id} = ''.join(parts)",
+                                explanation="Using list.append() followed by join() runs in O(N) linear time, avoiding redundant copy operations.",
+                            ),
+                        )
+                    )
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        if self.in_loop > 0:
+            is_expensive = False
+            call_type = ""
+            proposed = ""
+
+            # Check DB execute
+            if isinstance(node.func, ast.Attribute) and node.func.attr in (
+                "execute",
+                "executescript",
+            ):
+                is_expensive = True
+                call_type = f"Database query execution '{node.func.attr}'"
+                proposed = "# Consider batching queries or using executescript/executemany to execute statements in bulk."
+
+            # Check requests/httpx calls
+            elif (
+                isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in ("requests", "httpx", "urllib")
+                and node.func.attr
+                in ("get", "post", "put", "delete", "request", "urlopen")
+            ):
+                is_expensive = True
+                call_type = f"HTTP request '{node.func.value.id}.{node.func.attr}'"
+                proposed = "# Consider using connection pooling, session objects, or executing concurrent request calls outside the loop."
+
+            # Check subprocess / process executions
+            elif (
+                isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"
+            ) or (
+                isinstance(node.func, ast.Name)
+                and node.func.id in ("system", "popen", "subprocess")
+            ):
+                is_expensive = True
+                call_type = "Process execution call"
+                proposed = "# Avoid running external processes inside a loop. Execute parameters in bulk or design batch logic."
+
+            if is_expensive:
+                lineno = node.lineno
+                snippet = (
+                    self.source_lines[lineno - 1]
+                    if 0 < lineno <= len(self.source_lines)
+                    else ""
+                )
+                self.issues.append(
+                    Issue(
+                        title="Expensive Operation in Loop",
                         description=(
-                            f"String accumulation using '+=' on variable '{node.target.id}' detected inside a loop. "
-                            "Strings in Python are immutable; concatenating them in a loop creates a new copy of the string "
-                            "in each iteration, resulting in O(N^2) time complexity. "
-                            "Instead, append strings to a list and use ''.join(list) after the loop."
+                            f"{call_type} detected inside a loop. "
+                            "Performing I/O or subprocess creation inside a loop introduces substantial latency and overhead. "
+                            "Refactor to perform operations outside the loop or utilize bulk APIs."
                         ),
                         severity="medium",
                         category="performance",
@@ -66,58 +140,13 @@ class LoopPerformanceVisitor(ast.NodeVisitor):
                         code_snippet=snippet.strip(),
                         suggestion=Suggestion(
                             original_code=snippet,
-                            proposed_code=f"parts = []\nfor ...:\n    parts.append(...)\n{node.target.id} = ''.join(parts)",
-                            explanation="Using list.append() followed by join() runs in O(N) linear time, avoiding redundant copy operations."
-                        )
-                    ))
-        self.generic_visit(node)
-
-
-    def visit_Call(self, node):
-        if self.in_loop > 0:
-            is_expensive = False
-            call_type = ""
-            proposed = ""
-            
-            # Check DB execute
-            if isinstance(node.func, ast.Attribute) and node.func.attr in ('execute', 'executescript'):
-                is_expensive = True
-                call_type = f"Database query execution '{node.func.attr}'"
-                proposed = "# Consider batching queries or using executescript/executemany to execute statements in bulk."
-            
-            # Check requests/httpx calls
-            elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id in ('requests', 'httpx', 'urllib') and node.func.attr in ('get', 'post', 'put', 'delete', 'request', 'urlopen'):
-                is_expensive = True
-                call_type = f"HTTP request '{node.func.value.id}.{node.func.attr}'"
-                proposed = "# Consider using connection pooling, session objects, or executing concurrent request calls outside the loop."
-            
-            # Check subprocess / process executions
-            elif (isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess') or (isinstance(node.func, ast.Name) and node.func.id in ('system', 'popen', 'subprocess')):
-                is_expensive = True
-                call_type = "Process execution call"
-                proposed = "# Avoid running external processes inside a loop. Execute parameters in bulk or design batch logic."
-
-            if is_expensive:
-                lineno = node.lineno
-                snippet = self.source_lines[lineno - 1] if 0 < lineno <= len(self.source_lines) else ""
-                self.issues.append(Issue(
-                    title="Expensive Operation in Loop",
-                    description=(
-                        f"{call_type} detected inside a loop. "
-                        "Performing I/O or subprocess creation inside a loop introduces substantial latency and overhead. "
-                        "Refactor to perform operations outside the loop or utilize bulk APIs."
-                    ),
-                    severity="medium",
-                    category="performance",
-                    line_number=lineno,
-                    code_snippet=snippet.strip(),
-                    suggestion=Suggestion(
-                        original_code=snippet,
-                        proposed_code=proposed,
-                        explanation="Performing network request, database call, or process creation inside a loop incurs significant roundtrip, connection, or process context-switching overhead."
-                    ))
+                            proposed_code=proposed,
+                            explanation="Performing network request, database call, or process creation inside a loop incurs significant roundtrip, connection, or process context-switching overhead.",
+                        ),
+                    )
                 )
         self.generic_visit(node)
+
 
 def detect_loop_inefficiencies(tree: ast.AST, source_lines: List[str]) -> List[Issue]:
     visitor = LoopPerformanceVisitor(source_lines)

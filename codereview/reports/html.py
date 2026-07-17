@@ -1,5 +1,6 @@
 import html
-from codereview.models import ReviewResult, RepositoryReviewResult
+from codereview.models import RepositoryReviewResult
+
 
 def get_score_color(score: float) -> str:
     if score >= 90.0:
@@ -8,6 +9,7 @@ def get_score_color(score: float) -> str:
         return "#F59E0B"  # Amber orange
     else:
         return "#EF4444"  # Rose red
+
 
 def get_severity_color(severity: str) -> str:
     sev = severity.lower()
@@ -20,6 +22,7 @@ def get_severity_color(severity: str) -> str:
     else:
         return "#2563EB"
 
+
 def get_category_color(category: str) -> str:
     cat = category.lower()
     if cat == "security":
@@ -31,9 +34,11 @@ def get_category_color(category: str) -> str:
     else:
         return "#4B5563"  # Gray
 
+
 def format_score_badge(score: float) -> str:
     color = get_score_color(score)
     return f'<span style="background-color: {color}20; color: {color}; border: 1px solid {color}40;" class="score-badge">{score:.1f}/100</span>'
+
 
 def format_score(score: float) -> str:
     if score >= 90.0:
@@ -43,9 +48,10 @@ def format_score(score: float) -> str:
     else:
         return f"{score:.1f}/100 (Action Required)"
 
+
 def export_html(result, filepath: str) -> None:
     is_repo = isinstance(result, RepositoryReviewResult)
-    
+
     if is_repo:
         title = "Codivus Repository Review Dashboard"
         summary = result.summary
@@ -55,10 +61,7 @@ def export_html(result, filepath: str) -> None:
         total_issues = summary.total_issues
         critical = summary.critical_issues
         high = summary.high_issues
-        medium = summary.medium_issues
-        low = summary.low_issues
         summary_text = summary.summary_text
-        architecture = result.architecture_overview or "No architectural overview generated."
         folder_structure = result.folder_structure
     else:
         title = "Codivus File Review Dashboard"
@@ -70,12 +73,9 @@ def export_html(result, filepath: str) -> None:
         total_issues = summary.total_issues
         critical = summary.critical_issues
         high = summary.high_issues
-        medium = summary.medium_issues
-        low = summary.low_issues
         summary_text = summary.summary_text
-        architecture = ""
         folder_structure = ""
-        
+
     # Generate Architecture Section
     architecture_html = ""
     if is_repo and result.architecture_overview:
@@ -85,7 +85,7 @@ def export_html(result, filepath: str) -> None:
             <p>{html.escape(result.architecture_overview)}</p>
         </div>
         """
-        
+
     # Generate Folder Structure Section
     folder_html = ""
     if is_repo and folder_structure:
@@ -93,11 +93,13 @@ def export_html(result, filepath: str) -> None:
         <h2 class="section-title">Project Layout</h2>
         <div class="folder-tree">{html.escape(folder_structure)}</div>
         """
-        
+
     # Generate Repo Issues
     repo_issues_html = ""
     if is_repo and result.repo_issues:
-        repo_issues_html += '<h2 class="section-title">Repository Cross-file Issues</h2>'
+        repo_issues_html += (
+            '<h2 class="section-title">Repository Cross-file Issues</h2>'
+        )
         repo_issues_html += '<div style="margin-bottom: 2rem;">'
         for issue in result.repo_issues:
             repo_issues_html += f"""
@@ -118,7 +120,7 @@ def export_html(result, filepath: str) -> None:
                 """
             repo_issues_html += "</div>"
         repo_issues_html += "</div>"
-        
+
     # Generate File/Issues list
     file_issues_html = ""
     if is_repo:
@@ -126,7 +128,11 @@ def export_html(result, filepath: str) -> None:
             issues_content = ""
             if f_res.issues:
                 for issue in f_res.issues:
-                    line_prefix = f'<span class="badge" style="background-color:#1E293B; color:var(--text-muted);">Line {issue.line_number}</span>' if issue.line_number else ''
+                    line_prefix = (
+                        f'<span class="badge" style="background-color:#1E293B; color:var(--text-muted);">Line {issue.line_number}</span>'
+                        if issue.line_number
+                        else ""
+                    )
                     orig_code_block = ""
                     if issue.code_snippet:
                         orig_code_block = f"""
@@ -159,7 +165,7 @@ def export_html(result, filepath: str) -> None:
                     """
             else:
                 issues_content = '<div style="color:var(--text-muted); padding: 1rem;">No issues found in this file!</div>'
-                
+
             file_issues_html += f"""
             <div class="file-section">
                 <div class="file-header" onclick="toggleFileSection(this)">
@@ -182,7 +188,11 @@ def export_html(result, filepath: str) -> None:
         issues_content = ""
         if result.issues:
             for issue in result.issues:
-                line_prefix = f'<span class="badge" style="background-color:#1E293B; color:var(--text-muted);">Line {issue.line_number}</span>' if issue.line_number else ''
+                line_prefix = (
+                    f'<span class="badge" style="background-color:#1E293B; color:var(--text-muted);">Line {issue.line_number}</span>'
+                    if issue.line_number
+                    else ""
+                )
                 orig_code_block = ""
                 if issue.code_snippet:
                     orig_code_block = f"""
@@ -215,7 +225,7 @@ def export_html(result, filepath: str) -> None:
                 """
         else:
             issues_content = '<div style="color:var(--text-muted); padding: 1rem;">No issues found in this file!</div>'
-            
+
         file_issues_html = f"""
         <div class="file-section" style="border:none;">
             <div class="file-body" style="display:block; background-color:transparent; border-top:none; padding:0;">
@@ -223,7 +233,7 @@ def export_html(result, filepath: str) -> None:
             </div>
         </div>
         """
-        
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
