@@ -26,6 +26,8 @@ htmlcov/
 .codereview_cache/
 .codivus/
 /reports/
+dist/
+*.egg-info/
 *.sarif
 *.html
 *.pdf
